@@ -45,7 +45,11 @@ def run(reporter, logger):
                                ("ResNet50",fusion.resnet)):
             ckpt = os.path.join(config.OUTPUT_DIR, f"Exp3_{backbone}.pth")
             if os.path.exists(ckpt):
-                sub.load_state_dict(torch.load(ckpt, map_location=config.DEVICE))
+                try:
+                    sub.load_state_dict(torch.load(ckpt, map_location=config.DEVICE))
+                except Exception as e:
+                    logger.warning(f"  [WARN] {ckpt} corrupt/unreadable ({e}) "
+                                   f"— {backbone} backbone starts random")
             else:
                 logger.warning(f"  [WARN] {ckpt} still missing — backbone starts random")
 

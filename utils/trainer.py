@@ -274,23 +274,33 @@ def run_or_load(model_fn, train_loader, val_loader, test_loader,
     model = model_fn()
 
     # ── Tier 2 ─────────────────────────────────────────────────────────────
+    _tier2_ok = False
     if not config.FORCE_RERUN and os.path.exists(ckpt_path) and os.path.exists(meta_path):
-        logger.info(f"  [{exp_prefix}/{model_name}] Tier 2 — checkpoint, skipping training")
-        model.load_state_dict(torch.load(ckpt_path, map_location=config.DEVICE))
-        meta = json.load(open(meta_path))
-        ta_h = meta["train_acc_history"]
-        va_h = meta["val_acc_history"]
-        tl_h = meta["train_loss_history"]
-        vl_h = meta["val_loss_history"]
+        try:
+            model.load_state_dict(torch.load(ckpt_path, map_location=config.DEVICE))
+            meta = json.load(open(meta_path))
+            ta_h = meta["train_acc_history"]
+            va_h = meta["val_acc_history"]
+            tl_h = meta["train_loss_history"]
+            vl_h = meta["val_loss_history"]
+            _tier2_ok = True
+            logger.info(f"  [{exp_prefix}/{model_name}] Tier 2 — checkpoint, skipping training")
+        except Exception as e:
+            logger.warning(f"  [{exp_prefix}/{model_name}] Tier 2 checkpoint corrupt/unreadable "
+                           f"({e}) — falling through to Tier 3 full training")
 
     # ── Tier 3 ─────────────────────────────────────────────────────────────
-    else:
+    if not _tier2_ok:
         logger.info(f"  [{exp_prefix}/{model_name}] Tier 3 — full training")
         if pretrain_path and os.path.exists(pretrain_path):
-            model.load_state_dict(
-                torch.load(pretrain_path, map_location=config.DEVICE), strict=False
-            )
-            logger.info(f"    Loaded pretrain weights: {pretrain_path} (strict=False)")
+            try:
+                model.load_state_dict(
+                    torch.load(pretrain_path, map_location=config.DEVICE), strict=False
+                )
+                logger.info(f"    Loaded pretrain weights: {pretrain_path} (strict=False)")
+            except Exception as e:
+                logger.warning(f"    Pretrain weights corrupt/unreadable ({e}) "
+                               f"— training from scratch without warm-start")
         ta_h, va_h, tl_h, vl_h = train(
             model, train_loader, val_loader, exp_prefix, model_name, logger
         )
