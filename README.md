@@ -1,121 +1,236 @@
-# Breast Cancer Grading System
+# Breast Cancer Grading — Deep Learning Pipeline
 
-Deep learning experiments comparing CNN architectures for automated breast cancer histopathology grading (Grade I, II, III).
+Automatic grading of breast cancer histopathology images (Grade I / II / III) using a
+4-experiment CNN pipeline with progressive reporting. Charts and Excel update after every
+single model finishes so results are always available mid-run.
 
-## Experiment Matrix
+---
 
-| # | Name | Activation | Attention | Models |
-|---|------|-----------|-----------|--------|
-| 1 | Baseline CNN | ReLU | — | AlexNet, VGG16, ResNet50 |
-| 2 | CNN + GELU | GELU | — | AlexNet, VGG16, ResNet50 |
-| 3 | CNN + SE-Block | ReLU | SE-Block | AlexNet, VGG16, ResNet50 |
-| 4 | Feature Fusion | ReLU | — | AlexNet + VGG16 + ResNet50 (ensemble) |
-| 5 | Proposed | GELU | CBAM | AlexNet, VGG16, ResNet50 |
+## Architecture Overview
 
-## Requirements
+| Phase | Description |
+|-------|-------------|
+| **Phase 1 (this project)** | CNN-based grading — SE-Block or CBAM attention, 4 experiments |
+| **Phase 2 (future)** | Mask-guided attention from HoVer-Net / U-Net segmentation outputs |
 
-- Python 3.8+
-- See `requirements.txt`
-
-```bash
-pip install -r requirements.txt
+**Experiment chain:**
+```
+ImageNet → Exp1 (ReLU, no attention)     ← independent baseline
+ImageNet → Exp2 (GELU, no attention)     ← fair GELU comparison
+Exp2.pth → Exp3 (GELU + attention)       ← backbone reused, only attention trains
+Exp3.pth → Exp4 (3-CNN fusion + GELU + attention)  ← all backbones frozen
 ```
 
-## Dataset Structure
-
-```
-dataset_root/
-├── train/
-│   ├── Grade I/
-│   ├── Grade II/
-│   └── Grade III/
-├── val/
-│   └── ...
-└── test/
-    └── ...
-```
-
-## Running Locally
-
-```bash
-python main.py
-```
-
-You will be prompted to enter the dataset path and select an experiment (1–5, or 6 for all).
-
-**To force retrain** even if a checkpoint already exists, set in `config.py`:
-```python
-FORCE_RERUN = True
-```
-
-## Running on Google Colab
-
-1. Open `colab_runner.ipynb` in Google Colab
-2. Edit the two path cells to point to your Google Drive folders
-3. Run all cells — training is automatically skipped for any model that already has a saved checkpoint
-
-See [Colab Setup](#colab-setup) below for the full walkthrough.
-
-## Output Files
-
-All outputs are saved to `OUTPUT_DIR` (default: `outputs/`, configurable in `config.py`):
-
-| File | Description |
-|------|-------------|
-| `results_YYYYMMDD_HHMMSS.xlsx` | Full results — Summary, Per-Class Metrics, Confusion Matrices |
-| `Exp1_AlexNet.pth` | Saved model weights (checkpoint) |
-| `Exp1_AlexNet_meta.json` | Train/val metrics paired with the checkpoint |
-| `predictions_Exp1_AlexNet.json` | Per-image path + true label + predicted label |
-| `cm_exp1_AlexNet.png` | Confusion matrix image |
-
-## Colab Setup
-
-### Step 1 — Prepare Google Drive
-
-Create these two folders in your Drive:
-- `MyDrive/SantikaDataset/` — upload your dataset here (train/val/test structure)
-- `MyDrive/SantikaOutputs/` — checkpoints and results will be saved here
-
-### Step 2 — Push this repo to GitHub
-
-```bash
-git init
-git config --local user.name "YourGitHubUsername"
-git config --local user.email "your@email.com"
-git remote add origin https://github.com/YourAccount/SantikaCancer.git
-git add .
-git commit -m "Initial commit"
-git push -u origin main
-```
-
-### Step 3 — Open colab_runner.ipynb
-
-Upload `colab_runner.ipynb` to Colab or open directly from GitHub, then follow the instructions inside each cell.
+---
 
 ## Project Structure
 
 ```
-Santika/
-├── config.py              # All hyperparameters and paths
-├── main.py                # Interactive CLI runner (local use)
-├── colab_runner.ipynb     # Google Colab notebook
+CancerGrading/
+├── config.py                   # All toggles live here
+├── main.py                     # Entry point — numbered menu 1-7
 ├── requirements.txt
+│
+├── data/
+│   └── loader.py               # DataLoader factory (70/15/15 split + augmentation)
+│
 ├── models/
-│   ├── alexnet.py
-│   ├── vgg16.py
-│   ├── resnet50.py
-│   ├── fusion.py
-│   └── attention.py       # SEBlock, CBAM
+│   ├── attention.py            # SEBlock, CBAM, MaskGuidedAttention stub
+│   ├── alexnet.py              # CustomAlexNet (pretrained, configurable act + attn)
+│   ├── vgg16.py                # CustomVGG16
+│   ├── resnet50.py             # CustomResNet50
+│   └── fusion.py               # FusionModel — AlexNet + VGG16 + ResNet50 concat head
+│
+├── utils/
+│   ├── logger.py               # Console + file logging
+│   ├── trainer.py              # train(), evaluate(), run_or_load() — 3-tier cache
+│   ├── results_saver.py        # In-memory accumulator
+│   ├── reporter.py             # DiagnosticCompiler → 4-sheet Excel
+│   └── plotter.py              # Training curves, CM heatmap, per-class bar, comparison
+│
 ├── experiments/
-│   ├── exp1_baseline.py
-│   ├── exp2_gelu.py
-│   ├── exp3_attention.py
-│   ├── exp4_fusion.py
-│   └── exp5_proposed.py
-└── utils/
-    ├── data_loader.py
-    ├── trainer.py
-    ├── metrics.py
-    ├── results_saver.py
-    └── logger.py
+│   ├── exp1_baseline.py        # CNN Classic (ReLU)
+│   ├── exp2_gelu.py            # CNN + GELU
+│   ├── exp3_attention.py       # CNN + GELU + Attention
+│   └── exp4_fusion.py          # Fusion CNN + GELU + Attention
+│
+└── outputs/
+    ├── *_eval.json             # Per-model metrics cache
+    ├── *_meta.json             # Per-model training history
+    ├── *.pth                   # Checkpoints
+    ├── predictions_*.json      # Per-sample prediction records
+    └── reports/
+        ├── breast_cancer_grading_diagnostic_report_YYYYMMDD.xlsx
+        ├── training_{Exp}_{Model}.png
+        ├── cm_{Exp}_{Model}.png
+        ├── per_class_{Exp}_{Model}.png
+        └── model_comparison.png
 ```
+
+---
+
+## Quick Start
+
+**1. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+**2. Prepare dataset**
+
+Organize histopathology images into ImageFolder structure:
+```
+your_dataset/
+├── Grade1/   *.bmp  *.png  *.jpg
+├── Grade2/
+└── Grade3/
+```
+
+**3. Configure (optional)**
+
+Edit `config.py` to set paths and hyperparameters before running:
+```python
+INPUT_DIR      = "path/to/your_dataset"   # leave blank to be prompted
+OUTPUT_DIR     = "outputs"
+ATTENTION_TYPE = "SE"                     # "SE" or "CBAM"
+BATCH_SIZE     = 8                        # reduce to 4 if out of memory
+EPOCHS         = 50
+```
+
+**4. Run**
+```bash
+python main.py
+```
+
+**5. Select an option**
+```
+1. Experiment 1 - Baseline CNN (ReLU)
+2. Experiment 2 - CNN + GELU
+3. Experiment 3 - CNN + GELU + Attention
+4. Experiment 4 - Feature Fusion (3 CNNs) + GELU + Attention
+5. Run All  Exp1 → Exp2 → Exp3 → Exp4
+6. Regenerate Excel report only
+7. Regenerate all charts only
+```
+
+Choose **5** to run the full pipeline. Results are written to `outputs/reports/` as each
+model finishes — you can open the Excel file mid-run to see progress.
+
+---
+
+## Experiment Details
+
+### Exp1 — Baseline CNN (ReLU)
+- Models: AlexNet, VGG16, ResNet50 (each trained independently)
+- Activation: ReLU (torchvision default)
+- Attention: None
+- Init: ImageNet pretrained
+
+### Exp2 — CNN + GELU
+- Same as Exp1 but all activations replaced with GELU
+- Trains independently from ImageNet (fair comparison against Exp1)
+
+### Exp3 — CNN + GELU + Attention
+- Adds attention module (type set by `ATTENTION_TYPE` in `config.py`)
+- Backbone warm-started from Exp2 checkpoint (`strict=False`) — only the attention block
+  trains from scratch, saving the expensive VGG16/ResNet50 training time
+- Placement: after `features` block for AlexNet/VGG16; after each stage for ResNet50
+- **Auto-dependency:** triggers Exp2 automatically if its checkpoint is missing
+
+### Exp4 — Fusion CNN + GELU + Attention
+- Concatenates penultimate features: AlexNet(4096) + VGG16(4096) + ResNet50(2048) = **10,240**
+- Fusion head: `Linear(10240→1024) → GELU → Dropout(0.5) → Linear(1024→3)`
+- All three backbones loaded from Exp3 checkpoints and **frozen** — only head trains
+- **Auto-dependency:** triggers Exp3 → Exp2 chain automatically if checkpoints are missing
+
+---
+
+## Three-Tier Caching
+
+Re-running the same experiment is safe and fast:
+
+| Tier | Condition | Behaviour |
+|------|-----------|-----------|
+| 1 | `*_eval.json` exists | Load metrics instantly — skip model entirely |
+| 2 | `*.pth` + `*_meta.json` exist | Skip training — run evaluate() only |
+| 3 | Nothing found | Full train + evaluate |
+
+Set `FORCE_RERUN = True` in `config.py` to bypass all tiers and retrain from scratch.
+
+---
+
+## Attention Options
+
+Change `ATTENTION_TYPE` in `config.py` to switch between attention strategies:
+
+| Value | Description | Phase |
+|-------|-------------|-------|
+| `"SE"` | Squeeze-and-Excitation channel recalibration | Phase 1 |
+| `"CBAM"` | Channel + spatial attention in sequence | Phase 1 |
+| `"HoVerNet"` | Spatial mask from HoVer-Net tumor nuclei detection | Phase 2 (stub) |
+| `"MaskMitosis"` | Spatial mask from MaskMitosis mitotic figure detection | Phase 2 (stub) |
+| `"DKSUNet"` | Spatial mask from DKS-DoubleU-Net tubular nuclei segmentation | Phase 2 (stub) |
+| `"UNet"` | Spatial mask from U-Net epithelial nuclei segmentation | Phase 2 (stub) |
+
+Exp1 and Exp2 always use `None` regardless of this setting.
+
+---
+
+## Outputs
+
+| File | When generated |
+|------|---------------|
+| `training_{Exp}_{Model}.png` | Immediately after each model trains |
+| `cm_{Exp}_{Model}.png` | Immediately after each model evaluates |
+| `per_class_{Exp}_{Model}.png` | Immediately after each model evaluates |
+| `model_comparison.png` | Updated after every single model |
+| `breast_cancer_grading_diagnostic_report_YYYYMMDD.xlsx` | Updated after every single model |
+
+The Excel workbook has 4 sheets:
+- **Synthesis & Conclusion** — best model summary and clinical notes
+- **Overall Performance** — accuracy, macro F1, weighted F1 per model
+- **Confusion Matrices** — per-model grade confusion tables
+- **Detailed Process** — per-grade F1 scores for all models
+
+---
+
+## Standalone Regeneration
+
+If `outputs/*.json` files already exist from a previous run:
+```bash
+python main.py   # then select:
+# Option 6 — Regenerate Excel report only
+# Option 7 — Regenerate all charts only
+```
+
+---
+
+## Requirements
+
+| Package | Minimum Version |
+|---------|----------------|
+| torch | 2.0.0 |
+| torchvision | 0.15.0 |
+| tqdm | 4.65.0 |
+| scikit-learn | 1.2.0 |
+| numpy | 1.24.0 |
+| pandas | 2.0.0 |
+| openpyxl | 3.1.0 |
+| matplotlib | 3.7.0 |
+
+GPU is recommended. CPU training is supported but slow — reduce `BATCH_SIZE` to 4 if needed.
+
+---
+
+## Phase 2 — Future Work
+
+Phase 2 will replace the Phase 1 attention modules with spatial masks derived from
+segmentation networks running on the same histopathology patches:
+
+- **HoVer-Net** → tumor nuclei mask
+- **MaskMitosis** → mitotic figure mask
+- **DKS-DoubleU-Net** → tubular nuclei mask
+- **U-Net** → epithelial nuclei mask
+
+The `MaskGuidedAttention` stub in `models/attention.py` is already in place.
+A `mask_loader` alongside the image loader will be added to `data/loader.py` when Phase 2 begins.
