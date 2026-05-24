@@ -32,5 +32,4 @@ Thumbs.db
 .env
 
 # Dataset — too large for git, host on Google Drive
-data/
 dataset/
