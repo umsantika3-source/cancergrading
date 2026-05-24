@@ -1,0 +1,36 @@
+# Internal AI assistant folders
+.agents/
+.claude/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Outputs — large files, save to Google Drive instead
+outputs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Dataset — too large for git, host on Google Drive
+data/
+dataset/
