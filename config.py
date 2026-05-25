@@ -1,13 +1,13 @@
 import torch
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-OUTPUT_DIR = "/content/drive/MyDrive/CancerGradeResult"  # Colab → "/content/drive/MyDrive/SantikaOutputs"
-INPUT_DIR  = "/content/dataset"         # Colab → "/content/drive/MyDrive/SantikaDataset" | empty = prompt at runtime
+OUTPUT_DIR   = "outputs"          # Override in Colab: "/content/drive/MyDrive/Outputs"
+INPUT_DIR    = "D:/MyProject/Document/BuNurul/buSantika/kanker"                 # Override in Colab: "/content/drive/MyDrive/Dataset"
 
 # ── Data ───────────────────────────────────────────────────────────────────
-IMAGE_SIZE   = (479, 640)         # Exact size of the histopathology images in the dataset
+IMAGE_SIZE   = (224, 224)         # Exact size of the histopathology images in the dataset
 NUM_CLASSES  = 3                  # Grade I, Grade II, Grade III
-BATCH_SIZE   = 16                  # Reduce to 4 if OOM on CPU
+BATCH_SIZE   = 8                  # Reduce to 4 if OOM on CPU
 TRAIN_SPLIT  = 0.7
 VAL_SPLIT    = 0.15
 TEST_SPLIT   = 0.15

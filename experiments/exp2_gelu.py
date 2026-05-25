@@ -11,11 +11,15 @@ ATTENTION   = "None"
 
 def run(reporter, logger):
     from data.loader      import get_loaders
+    from data.dataloader  import get_data_loaders
     from models.alexnet   import CustomAlexNet
     from models.vgg16     import CustomVGG16
     from models.resnet50  import CustomResNet50
 
-    train_loader, val_loader, test_loader, class_names = get_loaders(
+    # train_loader, val_loader, test_loader, class_names = get_loaders(
+    #     config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
+    # )
+    train_loader, val_loader, test_loader, class_names = get_data_loaders(
         config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
     )
 

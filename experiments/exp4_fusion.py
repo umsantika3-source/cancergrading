@@ -18,9 +18,13 @@ MODEL_NAME  = "Fusion"
 
 def run(reporter, logger):
     from data.loader      import get_loaders
+    from data.dataloader  import get_data_loaders
     from models.fusion    import FusionModel
 
-    train_loader, val_loader, test_loader, class_names = get_loaders(
+    # train_loader, val_loader, test_loader, class_names = get_loaders(
+    #     config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
+    # )
+    train_loader, val_loader, test_loader, class_names = get_data_loaders(
         config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
     )
 
