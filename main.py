@@ -40,13 +40,14 @@ def main():
     reporter = DiagnosticCompiler()
     reporter.load_data()   # pre-populate with any already-completed experiments
 
-    if choice in ("1", "2", "3", "4", "5"):
+    if choice in ("1", "2", "3", "4", "5", "8"):
         config.INPUT_DIR = _prompt_data_dir(logger)
 
         from experiments.exp1_baseline  import run as run_exp1
         from experiments.exp2_gelu      import run as run_exp2
         from experiments.exp3_attention import run as run_exp3
         from experiments.exp4_fusion    import run as run_exp4
+        from experiments.exp_vgg19    import run as run_expvgg19
 
         if   choice == "1": run_exp1(reporter, logger)
         elif choice == "2": run_exp2(reporter, logger)
@@ -57,6 +58,7 @@ def main():
             run_exp2(reporter, logger)
             run_exp3(reporter, logger)
             run_exp4(reporter, logger)
+        elif choice == "8": run_expvgg19(reporter, logger)
 
     elif choice == "6":
         logger.info("Regenerating Excel report from existing eval.json files...")
