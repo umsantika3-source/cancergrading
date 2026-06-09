@@ -33,3 +33,4 @@ Thumbs.db
 
 # Dataset — too large for git, host on Google Drive
 dataset/
+apptest/checkpoints/
