@@ -5,7 +5,8 @@ import time
 import torch
 import numpy as np
 from sklearn.metrics import (accuracy_score, confusion_matrix,
-                              classification_report)
+                              classification_report,
+                              balanced_accuracy_score)
 from tqdm import tqdm
 
 import config
@@ -184,6 +185,8 @@ def evaluate(model, test_loader, class_names, exp_prefix, model_name):
         "macro_recall":     report["macro avg"]["recall"],
         "test_loss":        round(test_loss, 6),
     }
+    if config.USE_BALANCED_ACC:
+        eval_dict["balanced_accuracy"] = round(balanced_accuracy_score(all_labels, all_preds), 6)
 
     pred_records = []
     for i, (lbl, pred) in enumerate(zip(all_labels, all_preds)):

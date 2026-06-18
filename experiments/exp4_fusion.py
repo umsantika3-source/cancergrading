@@ -17,8 +17,7 @@ MODEL_NAME  = "Fusion"
 
 
 def run(reporter, logger):
-    from data.loader      import get_loaders
-    from data.dataloader  import get_data_loaders
+    from data.dataloader_v2 import get_data_loaders
     from models.fusion    import FusionModel
 
     # train_loader, val_loader, test_loader, class_names = get_loaders(

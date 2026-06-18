@@ -14,8 +14,7 @@ ACTIVATION  = "GELU"
 
 
 def run(reporter, logger):
-    from data.loader      import get_loaders
-    from data.dataloader  import get_data_loaders
+    from data.dataloader_v2 import get_data_loaders
     from models.alexnet   import CustomAlexNet
     from models.vgg16     import CustomVGG16
     from models.resnet50  import CustomResNet50

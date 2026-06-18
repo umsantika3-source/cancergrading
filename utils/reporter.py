@@ -8,6 +8,11 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 import config
+from utils.nottingham_validator import (
+    build_nottingham_validation_block, grade_to_nottingham_range,
+    classify_misclassification_risk, infer_possible_components,
+    COMPONENT_DESCRIPTIONS, RISK_LEVELS,
+)
 
 
 _PURPLE     = "9400D3"
@@ -138,7 +143,7 @@ def _thin_border():
 
 class DiagnosticCompiler:
     """
-    Collects per-model results and writes a 4-sheet Excel workbook after each update.
+    Collects per-model results and writes a 5-sheet Excel workbook after each update.
     """
 
     def __init__(self):
@@ -175,6 +180,7 @@ class DiagnosticCompiler:
         self._sheet_performance(wb)
         self._sheet_confusion(wb)
         self._sheet_details(wb)
+        self._sheet_nottingham(wb)
 
         if "Sheet" in wb.sheetnames:
             del wb["Sheet"]
@@ -331,11 +337,20 @@ class DiagnosticCompiler:
             r += 1
         r += 1
 
-        # ── Section 5: Clinical Proof ──────────────────────────────────────────
-        _section_title(ws, r, 2, "5. Clinical Proof & Interpretation")
+        # ── Section 5: Nottingham Clinical Validation ─────────────────────────
+        _section_title(ws, r, 2, "5. Nottingham Clinical Grade Mapping")
         r += 1
 
         notes = [
+            ("Standard",
+             "Nottingham Histologic Grade (Elston-Ellis modification): "
+             "3-component grading system — Tubule Formation (1-3), "
+             "Mitotic Count (1-3), Nuclear Pleomorphism (1-3). "
+             "Total 3-9 → Grade I (3-5), Grade II (6-7), Grade III (8-9)."),
+            ("Interpretation",
+             "Each model prediction corresponds to a Nottingham total score "
+             "range. Grade I = well-differentiated, Grade II = moderately-"
+             "differentiated, Grade III = poorly-differentiated."),
             ("Critical error",
              "Grade III misclassified as Grade I is the most dangerous error — "
              "under-treatment of aggressive cancer. Review off-diagonal CM[2,0]."),
@@ -355,6 +370,48 @@ class DiagnosticCompiler:
             c.alignment = Alignment(wrap_text=True)
             ws.row_dimensions[r].height = 32
             r += 1
+
+        # ── Section 6: Per-Model Nottingham Mapping ───────────────────────────
+        r += 1
+        _section_title(ws, r, 2, "6. Per-Model Nottingham Grade Distribution")
+        r += 1
+
+        for (exp, model), data in self._models.items():
+            preds  = data.get("preds", [])
+            eval_d = data.get("eval", {})
+            if not preds:
+                continue
+
+            class_names = ["Grade I", "Grade II", "Grade III"]
+            nv_block = build_nottingham_validation_block(eval_d, preds, class_names)
+            cs = nv_block.get("clinical_summary", {})
+
+            ws.cell(r, 1, f"{exp} / {model}").font = Font(bold=True, color=_PURPLE)
+            ws.cell(r, 2, f"{cs.get('total_samples', 0)} test images")
+            r += 1
+
+            for gs in cs.get("grade_summaries", []):
+                ws.cell(r, 1, f"  {gs['grade']}")
+                ws.cell(r, 2, (
+                    f"Predicted: {gs['predicted_count']} ({gs['predicted_percentage']}%) | "
+                    f"True: {gs['true_count']} ({gs['true_percentage']}%) | "
+                    f"Nottingham total {gs['nottingham_range']} — {gs['clinical_name']}"
+                ))
+                ws.row_dimensions[r].height = 20
+                r += 1
+
+            # Risk summary
+            ra = nv_block.get("risk_analysis", {})
+            ws.cell(r, 1, "  Clinical Risk Assessment").font = Font(bold=True)
+            ws.cell(r, 2, (
+                f"Critical: {ra.get('critical_misclassifications', 0)} ({ra.get('critical_pct', 0)}%) | "
+                f"High: {ra.get('high_risk_misclassifications', 0)} ({ra.get('high_risk_pct', 0)}%) | "
+                f"Moderate: {ra.get('moderate_risk_misclassifications', 0)} ({ra.get('moderate_risk_pct', 0)}%) | "
+                f"Low: {ra.get('low_risk_misclassifications', 0)} ({ra.get('low_risk_pct', 0)}%) | "
+                f"Correct: {ra.get('correct_predictions', 0)} ({ra.get('correct_pct', 0)}%)"
+            ))
+            ws.row_dimensions[r].height = 20
+            r += 2
 
     # ── Sheet 2 — Overall Performance ─────────────────────────────────────────
 
@@ -540,3 +597,148 @@ class DiagnosticCompiler:
                         pred_cell.fill = PatternFill("solid", fgColor="FFEBEE")
 
                 row += 1
+
+    # ── Sheet 5 — Nottingham Validation ────────────────────────────────────────
+
+    def _sheet_nottingham(self, wb):
+        """Create a dedicated Nottingham Clinical Validation worksheet."""
+        ws = wb.create_sheet("Nottingham Validation")
+        ws.column_dimensions["A"].width = 30
+        ws.column_dimensions["B"].width = 50
+        ws.column_dimensions["C"].width = 20
+        ws.column_dimensions["D"].width = 50
+
+        grade_labels = ["Grade I", "Grade II", "Grade III"]
+        r = 1
+
+        # ── Title ───────────────────────────────────────────────────────────────
+        ws.merge_cells(f"A{r}:D{r}")
+        c = ws.cell(r, 1, "Nottingham Histologic Grade — Clinical Validation")
+        c.font  = Font(bold=True, size=14, color=_WHITE)
+        c.fill  = PatternFill("solid", fgColor=_PURPLE)
+        c.alignment = Alignment(horizontal="center")
+        ws.row_dimensions[r].height = 28
+        r += 2
+
+        # ── Section A: Nottingham System Reference ──────────────────────────────
+        _section_title(ws, r, 4, "A. Nottingham Grading System Reference")
+        r += 1
+        ref_data = [
+            ("Total Score Range", "Clinical Grade", "Differentiation", "Prognosis"),
+            ("3 – 5", "Grade I", "Well-differentiated", "Favorable"),
+            ("6 – 7", "Grade II", "Moderately-differentiated", "Moderate"),
+            ("8 – 9", "Grade III", "Poorly-differentiated", "Aggressive"),
+        ]
+        for i, row_data in enumerate(ref_data):
+            for col, val in enumerate(row_data, 1):
+                c = ws.cell(r, col, val)
+                c.alignment = Alignment(horizontal="center", vertical="center")
+                c.border = _thin_border()
+                if i == 0:
+                    c.font = Font(bold=True, color=_WHITE)
+                    c.fill = PatternFill("solid", fgColor=_PURPLE)
+                else:
+                    c.font = Font(bold=False)
+                    if i == 3:
+                        c.font = Font(color="B71C1C", bold=True)
+                        c.fill = PatternFill("solid", fgColor="FFEBEE")
+            r += 1
+
+        r += 1
+        _section_title(ws, r, 4, "B. Component Score Descriptions")
+        r += 1
+
+        comp_headers = ["Component", "Score 1", "Score 2", "Score 3"]
+        for col, val in enumerate(comp_headers, 1):
+            c = ws.cell(r, col, val)
+            c.font  = Font(bold=True, color=_WHITE)
+            c.fill  = PatternFill("solid", fgColor=_PURPLE)
+            c.alignment = Alignment(horizontal="center")
+            c.border = _thin_border()
+        r += 1
+
+        for comp_name, scores in [
+            ("Tubule Formation", [COMPONENT_DESCRIPTIONS["tubule"][s] for s in (1, 2, 3)]),
+            ("Mitotic Count",    [COMPONENT_DESCRIPTIONS["mitotic"][s] for s in (1, 2, 3)]),
+            ("Nuclear Pleomorphism", [COMPONENT_DESCRIPTIONS["pleomorphism"][s] for s in (1, 2, 3)]),
+        ]:
+            ws.cell(r, 1, comp_name).font = Font(bold=True)
+            ws.cell(r, 1).border = _thin_border()
+            for col, desc in enumerate(scores, 2):
+                c = ws.cell(r, col, desc)
+                c.alignment = Alignment(wrap_text=True, vertical="center")
+                c.border = _thin_border()
+            ws.row_dimensions[r].height = 36
+            r += 1
+
+        r += 2
+
+        # ── Section C: Per-Model Nottingham Validation ─────────────────────────
+        _section_title(ws, r, 4, "C. Per-Model Nottingham Grade Distribution")
+        r += 1
+
+        for (exp, model), data in self._models.items():
+            preds  = data.get("preds", [])
+            eval_d = data.get("eval", {})
+            if not preds:
+                continue
+
+            nv_block = build_nottingham_validation_block(eval_d, preds, grade_labels)
+            cs = nv_block.get("clinical_summary", {})
+            ra = nv_block.get("risk_analysis", {})
+
+            # Model header
+            ws.merge_cells(f"A{r}:D{r}")
+            c = ws.cell(r, 1, f"{exp} — {model}")
+            c.font  = Font(bold=True, size=12, color=_WHITE)
+            c.fill  = PatternFill("solid", fgColor=_PURPLE)
+            c.alignment = Alignment(horizontal="center")
+            ws.row_dimensions[r].height = 22
+            r += 1
+
+            # Summary table header
+            sub_headers = ["Grade", "Nottingham Range", "Predicted (n, %)", "Clinical Name"]
+            for col, val in enumerate(sub_headers, 1):
+                _hdr(ws.cell(r, col), val)
+                ws.column_dimensions[get_column_letter(col)].width = max(
+                    ws.column_dimensions[get_column_letter(col)].width, 20
+                )
+            r += 1
+
+            for gs in cs.get("grade_summaries", []):
+                ws.cell(r, 1, gs["grade"]).font = Font(bold=True)
+                ws.cell(r, 2, gs["nottingham_range"]).alignment = Alignment(horizontal="center")
+                ws.cell(r, 3, f"{gs['predicted_count']} ({gs['predicted_percentage']}%)")
+                ws.cell(r, 4, gs["clinical_name"])
+                for col in range(1, 5):
+                    ws.cell(r, col).border = _thin_border()
+                r += 1
+
+            # Clinical risk row
+            r += 1
+            ws.cell(r, 1, "Clinical Risk Assessment").font = Font(bold=True, color=_DARK)
+            ws.cell(r, 2, "")
+            risks = [
+                ("Critical", ra.get("critical_misclassifications", 0), ra.get("critical_pct", 0), RISK_LEVELS["critical"]["color"]),
+                ("High",     ra.get("high_risk_misclassifications", 0), ra.get("high_risk_pct", 0), RISK_LEVELS["high"]["color"]),
+                ("Moderate", ra.get("moderate_risk_misclassifications", 0), ra.get("moderate_risk_pct", 0), RISK_LEVELS["moderate"]["color"]),
+                ("Low",      ra.get("low_risk_misclassifications", 0), ra.get("low_risk_pct", 0), RISK_LEVELS["low"]["color"]),
+            ]
+            for col, (label, count, pct, color) in enumerate(risks, 1):
+                c = ws.cell(r + 1, col, f"{label}: {count} ({pct}%)")
+                c.font = Font(color=color, bold=True)
+                c.alignment = Alignment(horizontal="center")
+                c.border = _thin_border()
+            r += 2
+
+            # Clinical interpretation
+            if cs.get("clinical_interpretation"):
+                ws.merge_cells(f"A{r}:D{r}")
+                c = ws.cell(r, 1, "Clinical Interpretation")
+                c.font = Font(bold=True, size=11, color=_PURPLE)
+                r += 1
+                ws.merge_cells(f"A{r}:D{r}")
+                c = ws.cell(r, 1, cs["clinical_interpretation"])
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+                ws.row_dimensions[r].height = 120
+                r += 3
