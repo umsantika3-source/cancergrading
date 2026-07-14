@@ -36,6 +36,8 @@ def train(model, train_loader, val_loader, exp_prefix, model_name, logger,
     model     = model.to(device)
     if criterion is None:
         criterion = torch.nn.CrossEntropyLoss()
+    elif criterion.weight is not None:
+        criterion.weight = criterion.weight.to(device)
     if lr is None:
         lr = config.HEAD_LR if "Fusion" in model_name else config.LEARNING_RATE
     optimizer = torch.optim.Adam(

@@ -34,7 +34,7 @@ def _compute_class_weights(train_loader, num_classes, logger):
     weights = counts.sum() / (num_classes * counts)
     logger.info(f"  [WEIGHTS] Per-class sample counts: {counts.tolist()}")
     logger.info(f"  [WEIGHTS] Computed class weights: {weights.tolist()}")
-    return torch.tensor(weights, dtype=torch.float32)
+    return torch.tensor(weights, dtype=torch.float32, device=config.DEVICE)
 
 
 def run(reporter, logger):
