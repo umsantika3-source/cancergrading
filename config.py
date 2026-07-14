@@ -16,8 +16,9 @@ RANDOM_SEED  = 42
 
 # ── Training ───────────────────────────────────────────────────────────────
 EPOCHS        = 50
-PATIENCE      = 5
-LEARNING_RATE = 1e-4
+PATIENCE      = 10
+LEARNING_RATE = 1e-3          # Higher base LR for fusion head (scaled up from 1e-4)
+HEAD_LR       = 1e-3          # LR for the fusion head specifically
 
 # ── Augmentation (geometric) ───────────────────────────────────────────────
 # Applied on-the-fly in data/dataloader.py (current) or pre-augmented in org_kfold_v2.py (future).

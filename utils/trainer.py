@@ -16,18 +16,31 @@ import config
 # Core training loop
 # ─────────────────────────────────────────────────────────────────────────────
 
-def train(model, train_loader, val_loader, exp_prefix, model_name, logger):
+def train(model, train_loader, val_loader, exp_prefix, model_name, logger,
+          criterion=None, lr=None):
     """
     Trains model with early stopping and checkpointing.
     Returns (train_acc_h, val_acc_h, train_loss_h, val_loss_h).
     Best checkpoint saved to outputs/{exp_prefix}_{model_name}.pth.
+
+    Args:
+        model: the nn.Module to train
+        train_loader, val_loader: data loaders
+        exp_prefix, model_name: used for checkpoint naming
+        logger: logger instance
+        criterion: loss function (default: CrossEntropyLoss)
+        lr: learning rate (default: config.HEAD_LR if "Fusion" in model_name
+            else config.LEARNING_RATE)
     """
     device    = config.DEVICE
     model     = model.to(device)
-    criterion = torch.nn.CrossEntropyLoss()
+    if criterion is None:
+        criterion = torch.nn.CrossEntropyLoss()
+    if lr is None:
+        lr = config.HEAD_LR if "Fusion" in model_name else config.LEARNING_RATE
     optimizer = torch.optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()),
-        lr=config.LEARNING_RATE,
+        lr=lr,
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, patience=2, factor=0.5
@@ -205,11 +218,22 @@ def evaluate(model, test_loader, class_names, exp_prefix, model_name):
 def run_or_load(model_fn, train_loader, val_loader, test_loader,
                 class_names, exp_prefix, model_name, logger,
                 activation="ReLU", attention="None",
-                pretrain_path=None):
+                pretrain_path=None, criterion=None, lr=None):
     """
     Tier 1 — eval.json exists       → load metrics instantly, skip model entirely.
     Tier 2 — .pth + _meta.json      → skip training, run evaluate() only.
     Tier 3 — nothing                → full train + evaluate.
+
+    Args:
+        model_fn: callable returning an nn.Module
+        train_loader, val_loader, test_loader: data loaders
+        class_names: list of class name strings
+        exp_prefix, model_name: naming for checkpoint files
+        logger: logger instance
+        activation, attention: metadata labels
+        pretrain_path: optional path to warm-start weights
+        criterion: loss function (passed through to train())
+        lr: learning rate (passed through to train())
 
     Returns:
         (eval_dict, pred_records, cm, per_class,
@@ -305,7 +329,8 @@ def run_or_load(model_fn, train_loader, val_loader, test_loader,
                 logger.warning(f"    Pretrain weights corrupt/unreadable ({e}) "
                                f"— training from scratch without warm-start")
         ta_h, va_h, tl_h, vl_h = train(
-            model, train_loader, val_loader, exp_prefix, model_name, logger
+            model, train_loader, val_loader, exp_prefix, model_name, logger,
+            criterion=criterion, lr=lr,
         )
         model.load_state_dict(torch.load(ckpt_path, map_location=config.DEVICE))
         meta = json.load(open(meta_path))
