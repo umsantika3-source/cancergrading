@@ -63,6 +63,7 @@ def main():
             "2": run_exp2,
             "3": run_exp3,
             "4": run_exp4,
+            "5": None,  # Run all experiments
         }
 
         def _run_selected(run_fn, fold_tag=""):
