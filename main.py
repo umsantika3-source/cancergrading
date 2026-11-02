@@ -144,8 +144,7 @@ def main():
         logger.info(f"✓ Structure validation passed ({config.DATA_STRUCTURE})")
 
         from experiments.exp_vgg19    import run as run_expvgg19
-
-		run_expvgg19(reporter, logger)
+        run_expvgg19(reporter, logger)
 		
     else:
         print("Invalid option. Please enter a number 1–7.")
