@@ -129,8 +129,8 @@ def main():
                                     meta["train_loss_history"], meta["val_loss_history"])
         save_comparison(config.OUTPUT_DIR)
         logger.info("Done — check outputs/reports/")
-
-	elif choice == "8":
+    
+    elif choice == "8":
         config.INPUT_DIR = _prompt_data_dir(logger)
 
         # ── Structure validation gate ──
