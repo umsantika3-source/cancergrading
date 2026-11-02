@@ -64,5 +64,13 @@ ATTENTION_TYPE = "SE"
 # FORCE_RERUN — True = ignore all caches and retrain everything from scratch
 FORCE_RERUN  = False
 
+# ── Dataset structure selection ────────────────────────────────────────────
+# "old"   -> flat train/val/test with grade subfolders (backward compatible)
+# "kfold5"-> fold_1/…fold_K/ with train/val inside each (from kfold5_structure.png)
+DATA_STRUCTURE   = "old"        # Change to "kfold5" to consume the k-fold layout
+K_FOLDS          = 5            # Number of folds in kfold5 mode
+CURRENT_FOLD     = 1            # Which fold to use when ITERATE_ALL_FOLDS=False
+ITERATE_ALL_FOLDS = False       # When True, runs experiments on every fold sequentially
+
 # ── Device ─────────────────────────────────────────────────────────────────
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

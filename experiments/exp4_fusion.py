@@ -37,13 +37,17 @@ def _compute_class_weights(train_loader, num_classes, logger):
     return torch.tensor(weights, dtype=torch.float32, device=config.DEVICE)
 
 
-def run(reporter, logger):
-    from data.dataloader_v2 import get_data_loaders
+def run(reporter, logger, data_loaders=None, fold_tag=""):
+    tagged_prefix = f"{EXP_PREFIX}{fold_tag}"
     from models.fusion    import FusionModel
 
-    train_loader, val_loader, test_loader, class_names = get_data_loaders(
-        config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
-    )
+    if data_loaders is not None:
+        train_loader, val_loader, test_loader, class_names = data_loaders
+    else:
+        from data.dataloader_v2 import get_data_loaders
+        train_loader, val_loader, test_loader, class_names = get_data_loaders(
+            config.INPUT_DIR, config.IMAGE_SIZE, config.BATCH_SIZE, config.RANDOM_SEED
+        )
 
     logger.info(f"  [DEBUG] class_names = {class_names}")
 
@@ -56,7 +60,7 @@ def run(reporter, logger):
         if not os.path.exists(exp3_path):
             logger.info(f"  [DEPENDENCY] Exp3_{backbone}.pth not found — running Exp3 first...")
             from experiments.exp3_attention import run as run_exp3
-            run_exp3(reporter, logger)
+            run_exp3(reporter, logger, data_loaders=data_loaders, fold_tag=fold_tag)
             break  # run_exp3 handles all three backbones at once
 
     # Compute class weights from training data to handle imbalance
@@ -99,15 +103,15 @@ def run(reporter, logger):
 
     eval_d, preds, cm, per_class, ta_h, va_h, tl_h, vl_h = run_or_load(
         model_fn, train_loader, val_loader, test_loader, class_names,
-        EXP_PREFIX, MODEL_NAME, logger,
+        tagged_prefix, MODEL_NAME, logger,
         activation=ACTIVATION, attention=attn_label,
         criterion=criterion,
         lr=config.HEAD_LR,
     )
 
-    save_training_curve(EXP_PREFIX, MODEL_NAME, ta_h, va_h, tl_h, vl_h)
-    reporter.update(EXP_PREFIX, MODEL_NAME, eval_d, preds)
-    save_cm_heatmap(EXP_PREFIX, MODEL_NAME, cm)
-    save_per_class_bar(EXP_PREFIX, MODEL_NAME, per_class)
+    save_training_curve(tagged_prefix, MODEL_NAME, ta_h, va_h, tl_h, vl_h)
+    reporter.update(tagged_prefix, MODEL_NAME, eval_d, preds)
+    save_cm_heatmap(tagged_prefix, MODEL_NAME, cm)
+    save_per_class_bar(tagged_prefix, MODEL_NAME, per_class)
     save_comparison(config.OUTPUT_DIR)
     logger.info(f"  [REPORT] Charts and Excel updated for {MODEL_NAME}")
