@@ -40,7 +40,7 @@ def main():
     reporter = DiagnosticCompiler()
     reporter.load_data()   # pre-populate with any already-completed experiments
 
-    if choice in ("1", "2", "3", "4", "5", "8"):
+    if choice in ("1", "2", "3", "4", "5"):
         config.INPUT_DIR = _prompt_data_dir(logger)
 
         # ── Structure validation gate ──
